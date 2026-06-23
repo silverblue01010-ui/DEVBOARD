@@ -1,0 +1,206 @@
+// DevBoard — Prisma schema
+// Built incrementally across phases; this file is the cumulative state at end of Phase 6.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ---------- Phase 0 ----------
+
+model Repository {
+  id            String   @id @default(cuid())
+  fullName      String   @unique // "org/repo"
+  installationId String
+  defaultBranch String   @default("main")
+  retentionDays Int      @default(90) // Phase 6, Risk 2
+  createdAt     DateTime @default(now())
+
+  pullRequests  PullRequest[]
+  teamConfig    TeamConfig?
+  auditLogs     AuditLog[]
+  metricSnapshots WeeklyMetricSnapshot[]
+  rateLimitState RateLimitState[]
+}
+
+model PullRequest {
+  id              String   @id @default(cuid())
+  repository      Repository @relation(fields: [repositoryId], references: [id])
+  repositoryId    String
+  number          Int
+  headSha         String
+  isFeatureBranch Boolean  @default(true)
+
+  // Phase 5 metrics timestamps
+  webhookReceivedAt   DateTime?
+  firstCommentPostedAt DateTime?
+  mergedAt            DateTime?
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  findings        Finding[]
+  reviewComments  ReviewComment[]
+
+  @@unique([repositoryId, number])
+}
+
+model Finding {
+  id           String   @id @default(cuid())
+  pullRequest  PullRequest @relation(fields: [pullRequestId], references: [id])
+  pullRequestId String
+  ruleId       String     // e.g. SEC-001, MAINT-002, or "LLM-DESIGN"
+  source       FindingSource @default(RULE)
+  severity     Severity
+  file         String
+  line         Int
+  message      String
+  suggestion   String?
+  confidence   Float
+  headSha      String
+  detectedAt   DateTime @default(now())
+
+  reactions    FindingReaction[]
+  reviewComment ReviewComment?
+
+  @@index([ruleId])
+  @@index([pullRequestId])
+}
+
+enum FindingSource {
+  RULE
+  LLM
+  PLUGIN
+}
+
+enum Severity {
+  critical
+  warning
+  suggestion
+}
+
+model ReviewComment {
+  id              String   @id @default(cuid())
+  pullRequest     PullRequest @relation(fields: [pullRequestId], references: [id])
+  pullRequestId   String
+  finding         Finding? @relation(fields: [findingId], references: [id])
+  findingId       String?  @unique
+  githubCommentId String   // id returned by GitHub API, used for later edits
+  body            String
+  resolvedAt      DateTime?
+  postedAt        DateTime @default(now())
+}
+
+model TeamConfig {
+  id           String   @id @default(cuid())
+  repository   Repository @relation(fields: [repositoryId], references: [id])
+  repositoryId String   @unique
+  // Parsed devboard.config.yml, cached. Source of truth is the file in the repo;
+  // this is a cache refreshed on PR open / push to default branch.
+  rawYaml      String
+  parsedJson   Json
+  // Encrypted secrets (Phase 3 constraint: never plaintext in the yaml)
+  slackWebhookEncrypted String?
+  jiraTokenEncrypted     String?
+  updatedAt    DateTime @updatedAt
+}
+
+// ---------- Phase 2: Feedback loop ----------
+
+model FindingReaction {
+  id        String   @id @default(cuid())
+  finding   Finding  @relation(fields: [findingId], references: [id])
+  findingId String
+  userId    String   // GitHub user id of reactor — not stored elsewhere as PII per Phase 6 Risk 2
+  reaction  ReactionType
+  createdAt DateTime @default(now())
+
+  @@unique([findingId, userId])
+}
+
+enum ReactionType {
+  useful
+  irrelevant
+}
+
+// ---------- Phase 6: Rule lifecycle / shadow mode ----------
+
+model RuleState {
+  ruleId      String   @id
+  state       RuleLifecycle @default(shadow)
+  precision   Float?
+  ratingsCount Int     @default(0)
+  promotedAt  DateTime?
+  suppressedAt DateTime?
+  updatedAt   DateTime @updatedAt
+}
+
+enum RuleLifecycle {
+  shadow
+  active
+  suppressed
+}
+
+// ---------- Phase 5: Metrics ----------
+
+model WeeklyMetricSnapshot {
+  id                  String   @id @default(cuid())
+  repository          Repository @relation(fields: [repositoryId], references: [id])
+  repositoryId        String
+  weekStart           DateTime
+  mttfrcMedianSeconds Int
+  mttfrcP95Seconds    Int
+  vulnDetectionRate   Float
+  reviewerHoursSaved  Float
+  satisfactionScore   Float?
+  createdAt           DateTime @default(now())
+
+  @@unique([repositoryId, weekStart])
+}
+
+// ---------- Phase 6: Audit log (Risk 2 — privacy) ----------
+
+model AuditLog {
+  id              String   @id @default(cuid())
+  repository      Repository @relation(fields: [repositoryId], references: [id])
+  repositoryId    String
+  prNumber        Int
+  callerService   String   // "api" | "analyzer" | "cli"
+  linesTransmitted Int
+  timestamp       DateTime @default(now())
+
+  @@index([repositoryId, timestamp])
+}
+
+// ---------- Phase 6: GitHub API rate limit tracking ----------
+
+model RateLimitState {
+  id             String   @id @default(cuid())
+  repository     Repository @relation(fields: [repositoryId], references: [id])
+  repositoryId   String
+  installationId String   @unique
+  remaining      Int
+  resetAt        DateTime
+  updatedAt      DateTime @updatedAt
+}
+
+// ---------- Phase 3: Auto-fix tracking ----------
+
+model AutoFixPR {
+  id          String   @id @default(cuid())
+  findingId   String   @unique
+  branchName  String
+  prNumber    Int?
+  status      AutoFixStatus @default(open)
+  createdAt   DateTime @default(now())
+}
+
+enum AutoFixStatus {
+  open
+  merged
+  closed
+}

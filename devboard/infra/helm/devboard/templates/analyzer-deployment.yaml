@@ -1,0 +1,46 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: devboard-analyzer
+  labels: { app: devboard-analyzer }
+spec:
+  replicas: {{ .Values.analyzer.replicaCount }}
+  selector:
+    matchLabels: { app: devboard-analyzer }
+  template:
+    metadata:
+      labels: { app: devboard-analyzer }
+    spec:
+      containers:
+        - name: analyzer
+          image: "{{ .Values.image.registry }}/devboard-analyzer:{{ .Values.image.analyzerTag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          ports:
+            - containerPort: {{ .Values.analyzer.port }}
+          envFrom:
+            - secretRef: { name: {{ .Values.secrets.existingSecretName }} }
+          env:
+            - name: DEVBOARD_MODE
+              value: {{ .Values.mode }}
+            - name: DEVBOARD_LLM_ENDPOINT
+              value: "{{ .Values.llm.selfHostedEndpoint }}"
+          readinessProbe:
+            httpGet: { path: /health, port: {{ .Values.analyzer.port }} }
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            httpGet: { path: /health, port: {{ .Values.analyzer.port }} }
+            initialDelaySeconds: 10
+            periodSeconds: 20
+          resources:
+            {{- toYaml .Values.analyzer.resources | nindent 12 }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: devboard-analyzer
+spec:
+  selector: { app: devboard-analyzer }
+  ports:
+    - port: {{ .Values.analyzer.port }}
+      targetPort: {{ .Values.analyzer.port }}

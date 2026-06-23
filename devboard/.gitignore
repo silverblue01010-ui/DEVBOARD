@@ -1,0 +1,15 @@
+node_modules/
+dist/
+build/
+.env
+*.pyc
+__pycache__/
+.pytest_cache/
+.venv/
+venv/
+*.egg-info/
+.DS_Store
+devboard_pg_data/
+*.log
+coverage/
+.eslintcache

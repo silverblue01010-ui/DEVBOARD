@@ -1,0 +1,40 @@
+# Place this file at the root of your repository as `devboard.config.yml`.
+# DevBoard parses it from the default branch on every PR open.
+
+gates:
+  - id: no-critical-security
+    description: "Block merge if any critical security finding"
+    condition: findings.critical.security > 0
+    action: block
+
+  - id: require-senior-review
+    description: "API route changes need senior approval"
+    condition: files.changed.matches("**/routes/**")
+    action: assign_reviewer
+    reviewer_role: "senior backend engineer"
+
+  - id: test-coverage-required
+    description: "Feature branches should update tests"
+    condition: findings.suggestion.test_coverage > 0 AND pr.is_feature_branch
+    action: warn
+
+notifications:
+  mode: inline # inline | digest
+  slack:
+    # webhook_url is stored encrypted server-side once configured via the dashboard/API —
+    # do not put real webhook URLs in this file in plaintext.
+    webhook_url: "${DEVBOARD_SLACK_WEBHOOK}"
+    channel: "#code-review"
+    on: [critical, gate_failure]
+
+integrations:
+  jira:
+    base_url: "https://yourcompany.atlassian.net"
+    project_key: "SEC"
+    # api_token is stored encrypted server-side, never here in plaintext.
+    api_token: "${DEVBOARD_JIRA_TOKEN}"
+
+plugins:
+  - name: my-custom-rules
+    path: .devboard/plugins/my-rules.js
+    language: node

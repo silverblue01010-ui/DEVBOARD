@@ -1,0 +1,23 @@
+{{- if .Values.ingress.enabled }}
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: devboard-api
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt # adjust to your cluster's issuer
+spec:
+  tls:
+    - hosts: [{{ .Values.ingress.host }}]
+      secretName: {{ .Values.ingress.tlsSecretName }}
+  rules:
+    - host: {{ .Values.ingress.host }}
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: devboard-api
+                port:
+                  number: {{ .Values.api.port }}
+{{- end }}

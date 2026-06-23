@@ -1,0 +1,71 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  node:
+    name: Node — lint, typecheck, test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Generate Prisma client
+        run: npm run db:generate
+
+      - name: Lint (eslint)
+        run: npm run lint --if-present
+
+      - name: Typecheck (tsc)
+        run: npm run typecheck
+
+      - name: Test (jest)
+        run: npm run test --workspace=apps/api
+
+  python:
+    name: Python — lint, typecheck, test
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/analyzer
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Install dependencies
+        run: |
+          pip install -r requirements.txt
+          pip install flake8
+
+      - name: Lint (flake8)
+        run: flake8 app
+
+      - name: Test (pytest)
+        run: pytest -v
+
+  docker-build:
+    name: Build images
+    runs-on: ubuntu-latest
+    needs: [node, python]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build api image
+        run: docker build -t devboard-api:ci -f apps/api/Dockerfile .
+
+      - name: Build analyzer image
+        run: docker build -t devboard-analyzer:ci ./apps/analyzer

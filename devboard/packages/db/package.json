@@ -1,0 +1,19 @@
+{
+  "name": "@devboard/db",
+  "version": "0.1.0",
+  "private": true,
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "generate": "prisma generate --schema=schema.prisma",
+    "migrate": "prisma migrate dev --schema=schema.prisma",
+    "build": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "@prisma/client": "^5.18.0"
+  },
+  "devDependencies": {
+    "prisma": "^5.18.0",
+    "typescript": "^5.5.0"
+  }
+}

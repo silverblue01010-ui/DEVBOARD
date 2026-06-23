@@ -1,0 +1,61 @@
+# DevBoard on-prem Helm values.
+# Data residency: with mode=onprem, all source code and findings stay in this
+# cluster. No telemetry leaves the cluster unless explicitly opted in below.
+
+mode: onprem # cloud | onprem
+
+image:
+  registry: ghcr.io/your-org
+  apiTag: "0.1.0"
+  analyzerTag: "0.1.0"
+  pullPolicy: IfNotPresent
+
+api:
+  replicaCount: 2
+  port: 3000
+  resources:
+    requests: { cpu: 250m, memory: 256Mi }
+    limits: { cpu: 1000m, memory: 512Mi }
+
+analyzer:
+  replicaCount: 2
+  port: 8000
+  resources:
+    requests: { cpu: 500m, memory: 512Mi }
+    limits: { cpu: 2000m, memory: 1Gi }
+
+worker:
+  replicaCount: 2
+  resources:
+    requests: { cpu: 250m, memory: 256Mi }
+    limits: { cpu: 1000m, memory: 512Mi }
+
+postgres:
+  enabled: true # set false to point at an external managed Postgres instead
+  storage: 20Gi
+  externalConnectionSecretName: "" # if postgres.enabled=false, name of a Secret with DATABASE_URL
+
+redis:
+  enabled: true
+  externalConnectionSecretName: ""
+
+# Self-hosted model endpoint required when mode=onprem and LLM analysis is desired.
+# If left empty, Phase 2 LLM analysis is skipped entirely (rule-based analysis still runs).
+llm:
+  selfHostedEndpoint: ""
+
+# Telemetry is opt-in only in on-prem mode (Phase 6, Risk 2).
+telemetry:
+  enabled: false
+  endpoint: ""
+
+secrets:
+  # Name of a pre-created Kubernetes Secret containing:
+  # GITHUB_APP_ID, GITHUB_PRIVATE_KEY, GITHUB_WEBHOOK_SECRET, ANTHROPIC_API_KEY,
+  # API_KEY_SALT, SLACK_WEBHOOK_URL (optional), JIRA_API_TOKEN (optional)
+  existingSecretName: devboard-secrets
+
+ingress:
+  enabled: true
+  host: devboard.internal.example.com
+  tlsSecretName: devboard-tls

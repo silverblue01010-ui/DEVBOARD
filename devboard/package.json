@@ -1,0 +1,27 @@
+{
+  "name": "devboard",
+  "private": true,
+  "version": "0.1.0",
+  "description": "DevBoard — automated GitHub PR review system (rules + ML + policy enforcement)",
+  "workspaces": [
+    "apps/api",
+    "packages/db",
+    "packages/shared",
+    "packages/cli"
+  ],
+  "scripts": {
+    "postinstall": "npm run build --workspace=packages/shared",
+    "dev": "docker compose -f infra/docker/docker-compose.yml up --build",
+    "lint": "npm run lint --workspaces --if-present",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "test": "npm run test --workspaces --if-present",
+    "db:generate": "npm run generate --workspace=packages/db && npm run build --workspace=packages/db",
+    "db:migrate": "npm run migrate --workspace=packages/db"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "devDependencies": {
+    "typescript": "^5.5.0"
+  }
+}

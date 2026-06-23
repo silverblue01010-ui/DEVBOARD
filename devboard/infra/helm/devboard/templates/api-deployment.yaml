@@ -1,0 +1,58 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: devboard-api
+  labels: { app: devboard-api }
+spec:
+  replicas: {{ .Values.api.replicaCount }}
+  selector:
+    matchLabels: { app: devboard-api }
+  template:
+    metadata:
+      labels: { app: devboard-api }
+    spec:
+      containers:
+        - name: api
+          image: "{{ .Values.image.registry }}/devboard-api:{{ .Values.image.apiTag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          ports:
+            - containerPort: {{ .Values.api.port }}
+          envFrom:
+            - secretRef: { name: {{ .Values.secrets.existingSecretName }} }
+          env:
+            - name: DEVBOARD_MODE
+              value: {{ .Values.mode }}
+            - name: DEVBOARD_LLM_ENDPOINT
+              value: "{{ .Values.llm.selfHostedEndpoint }}"
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: {{ if .Values.postgres.enabled }}devboard-postgres{{ else }}{{ .Values.postgres.externalConnectionSecretName }}{{ end }}
+                  key: DATABASE_URL
+            - name: REDIS_URL
+              valueFrom:
+                secretKeyRef:
+                  name: {{ if .Values.redis.enabled }}devboard-redis{{ else }}{{ .Values.redis.externalConnectionSecretName }}{{ end }}
+                  key: REDIS_URL
+            - name: ANALYZER_URL
+              value: "http://devboard-analyzer:{{ .Values.analyzer.port }}"
+          readinessProbe:
+            httpGet: { path: /health, port: {{ .Values.api.port }} }
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            httpGet: { path: /health, port: {{ .Values.api.port }} }
+            initialDelaySeconds: 10
+            periodSeconds: 20
+          resources:
+            {{- toYaml .Values.api.resources | nindent 12 }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: devboard-api
+spec:
+  selector: { app: devboard-api }
+  ports:
+    - port: {{ .Values.api.port }}
+      targetPort: {{ .Values.api.port }}

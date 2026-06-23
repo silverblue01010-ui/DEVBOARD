@@ -1,0 +1,38 @@
+{{- if .Values.postgres.enabled }}
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: devboard-postgres
+spec:
+  serviceName: devboard-postgres
+  replicas: 1
+  selector:
+    matchLabels: { app: devboard-postgres }
+  template:
+    metadata:
+      labels: { app: devboard-postgres }
+    spec:
+      containers:
+        - name: postgres
+          image: postgres:15-alpine
+          ports: [{ containerPort: 5432 }]
+          env:
+            - { name: POSTGRES_USER, value: devboard }
+            - { name: POSTGRES_PASSWORD, valueFrom: { secretKeyRef: { name: devboard-postgres, key: POSTGRES_PASSWORD } } }
+            - { name: POSTGRES_DB, value: devboard }
+          volumeMounts:
+            - { name: data, mountPath: /var/lib/postgresql/data }
+  volumeClaimTemplates:
+    - metadata: { name: data }
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        resources: { requests: { storage: {{ .Values.postgres.storage }} } }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: devboard-postgres
+spec:
+  selector: { app: devboard-postgres }
+  ports: [{ port: 5432 }]
+{{- end }}
