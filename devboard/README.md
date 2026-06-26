@@ -113,8 +113,6 @@ npm run test --workspace=apps/api
 # Python (apps/analyzer)
 cd apps/analyzer && pytest -v
 ```
-const api_key = "sk_live_abc123def456789";
-console.log("debug", api_key);
 ## Policy-as-code
 
 Drop a `devboard.config.yml` in your repo root — see
@@ -132,3 +130,9 @@ See `docs/ARCHITECTURE.md`.
 ## Scope
 
 See `docs/scope-guardrails.md` for what DevBoard is and isn't.
+
+
+Webhook PR test
+
+const api_key = "sk_live_abc123def456789";
+console.log("debug", api_key);
